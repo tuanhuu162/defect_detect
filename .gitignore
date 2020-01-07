@@ -97,7 +97,6 @@ __pypackages__/
 # Celery stuff
 celerybeat-schedule
 celerybeat.pid
-
 # SageMath parsed files
 *.sage.py
 
@@ -127,3 +126,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# data
+elastic/
+elasticsearch/
+
+# intelij
+.idea/

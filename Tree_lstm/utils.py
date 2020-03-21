@@ -3,9 +3,10 @@ from __future__ import print_function
 
 import os
 import math
+import numpy as np
 
 import torch
-
+from anytree.iterators import PreOrderIter
 from .vocab import Vocab
 
 
@@ -67,3 +68,13 @@ def map_label_to_target(label, num_classes):
         target[0, floor-1] = ceil - label
         target[0, ceil-1] = label - floor
     return target
+
+def convert_tree(tree, device):
+    for node in PreOrderIter(tree):
+        # preorder_file.append(node)
+        node.tensor = node.tensor.to(device)
+    return tree
+
+def to_categorical(y, num_classes):
+    """ 1-hot encodes a tensor """
+    return np.eye(num_classes, dtype='uint8')[y]

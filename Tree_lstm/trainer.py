@@ -1,12 +1,13 @@
 from tqdm import tqdm
 
 import torch
-
-from . import utils
-
+from torch.autograd import Variable
+from .utils import convert_tree
+from sklearn.metrics import f1_score
+import numpy as np
 
 class Trainer(object):
-    def __init__(self, args, model, criterion, optimizer, device):
+    def __init__(self, args, model, criterion, optimizer, device, batchsize, type):
         super(Trainer, self).__init__()
         self.args = args
         self.model = model
@@ -14,43 +15,98 @@ class Trainer(object):
         self.optimizer = optimizer
         self.device = device
         self.epoch = 0
+        self.batchsize = batchsize
+        self.type = type
+
+    def to_categorical(self, y, num_classes):
+        """ 1-hot encodes a tensor """
+        return np.eye(num_classes, dtype='uint8')[y]
 
     # helper function for training
     def train(self, dataset):
         self.model.train()
         self.optimizer.zero_grad()
         total_loss = 0.0
-        indices = torch.randperm(len(dataset), dtype=torch.long, device='cpu')
-        for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
-            ltree, linput, rtree, rinput, label = dataset[indices[idx]]
-            target = utils.map_label_to_target(label, dataset.num_classes)
-            linput, rinput = linput.to(self.device), rinput.to(self.device)
-            target = target.to(self.device)
-            output = self.model(ltree, linput, rtree, rinput)
-            loss = self.criterion(output, target)
-            total_loss += loss.item()
-            loss.backward()
-            if idx % self.args.batchsize == 0 and idx > 0:
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-        self.epoch += 1
-        return total_loss / len(dataset)
+        if self.type == 'tree':
+            for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
+                tree, label = dataset[idx]
+                tree = convert_tree(tree, self.device)
+                label = torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).to(self.device)
+                input = torch.randn(3, 5, requires_grad=True)
+                target = torch.randn(3, 5)
+                loss = self.criterion(input, target)
+                output = self.model(tree, loss)
+                # print(output.shape, label.shape)
+                class_loss = self.criterion(output.to(torch.float64).view(1, -1), label.to(torch.float64).view(1, -1))
+                loss += class_loss
+                total_loss += loss.item()
+                loss.backward()
+                if idx % self.batchsize == 0 and idx > 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+            self.epoch += 1
+            return total_loss / len(dataset)
+        else:
+            for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
+                tree, label = dataset[idx]
+                # print(label)
+                train_batch = Variable(tree.to(self.device))
+                train_label = Variable(torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).view(1, -1)
+                                       .to(self.device))
+                output, _ = self.model(train_batch)
+                # output = self.model(train_batch)
+                # print(output[0], label)
+                # print(output.shape)
+
+                loss = self.criterion(output.to(torch.float64), train_label)
+                total_loss += loss.item()
+                loss.backward()
+                if idx % self.batchsize == 0 and idx > 0:
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
+                    # print('Epoch:', '%04d' % (self.epoch + 1), 'cost =', '{:.6f}'.format(loss))
+            self.epoch += 1
+            return total_loss / len(dataset)
+
 
     # helper function for testing
     def test(self, dataset):
         self.model.eval()
-        with torch.no_grad():
-            total_loss = 0.0
-            predictions = torch.zeros(len(dataset), dtype=torch.float, device='cpu')
-            indices = torch.arange(1, dataset.num_classes + 1, dtype=torch.float, device='cpu')
-            for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
-                ltree, linput, rtree, rinput, label = dataset[idx]
-                target = utils.map_label_to_target(label, dataset.num_classes)
-                linput, rinput = linput.to(self.device), rinput.to(self.device)
-                target = target.to(self.device)
-                output = self.model(ltree, linput, rtree, rinput)
-                loss = self.criterion(output, target)
-                total_loss += loss.item()
-                output = output.squeeze().to('cpu')
-                predictions[idx] = torch.dot(indices, torch.exp(output))
-        return total_loss / len(dataset), predictions
+        if self.type == 'tree':
+            with torch.no_grad():
+                total_loss = 0.0
+                predictions = []
+                indices = torch.arange(1, dataset.num_classes + 1, dtype=torch.float, device='cpu')
+                for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
+                    tree, label = dataset[idx]
+                    tree = convert_tree(tree, self.device)
+                    label = torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).to(self.device)
+                    input = torch.randn(3, 5, requires_grad=True)
+                    target = torch.randn(3, 5)
+                    loss = self.criterion(input, target)
+                    output = self.model(tree, loss)
+                    class_loss = self.criterion(output.to(torch.float64).view(1,-1), label.to(torch.float64).view(1,-1))
+                    loss += class_loss
+                    total_loss += loss.item()
+                    output = output.squeeze().to('cpu')
+                    predictions.append(output.numpy())
+            return total_loss / len(dataset), predictions
+        else:
+            with torch.no_grad():
+                total_loss = 0.0
+                predictions = []
+                indices = torch.arange(1, dataset.num_classes + 1, dtype=torch.float, device='cpu')
+                for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
+                    tree, label = dataset[idx]
+                    # print(label.shape)
+                    train_batch = Variable(tree.to(self.device))
+                    train_label = Variable(torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).view(1, -1).to(self.device))
+                    output, _ = self.model(train_batch)
+                    # output = self.model(train_batch)
+                    # print(output[0], label)
+                    # print(output.shape)
+                    loss = self.criterion(output.to(torch.float64), train_label)
+                    total_loss += loss.item()
+                    _, output = torch.max(output.squeeze(), dim=0)
+                    predictions.append(int(output.to('cpu').numpy()))
+            return total_loss / len(dataset), predictions

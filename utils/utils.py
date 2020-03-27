@@ -160,6 +160,7 @@ def preprocess_ver2(xml_file, vocab):
                     if previous == attrib['sourcepath']:
                         bug_instances.append(attrib)
                     else:
+                        extract_data(previous, bug_instances, vocab)
                         bug_instances = [attrib]
                         previous = attrib['sourcepath']
     extract_data(previous, bug_instances, vocab)
@@ -168,12 +169,15 @@ def preprocess_ver2(xml_file, vocab):
 def extract_data(filename, bug_instances, vocab):
     list_re = []
     # print("Extracting " + filename + " tree!!!!!!!!!!!!!!!!!!!")
+    match_cmt = ""
+    match_class = ""
     with open(os.path.join(DATA_PATH, filename), encoding="utf-8") as file:
         lines = [line.strip() for line in file.readlines()]
         for bug in bug_instances:
             start = bug['start']
             end = bug['end']
             for line in range(int(start), int(end) + 1):
+                clean_cmt = re.sub(r"", " ", lines[line])
                 clean = re.sub(r"[\"\'\s;(){}=+\-/!~<>.,%^&*#$|]+", " ", lines[line])
                 list_clean = [i for i in clean.split(" ") if i != ""]
                 if len(list_clean) > 0:
@@ -231,6 +235,12 @@ def traveler(parse_node, tree_node, list_regex):
         # print(list_child)
         for child in list_child:
             traveler(child, new_node, list_regex)
+
+def search_and_replace(pattern, string):
+    pass
+
+def get_branch():
+    pass
 
 
 if __name__ == "__main__":

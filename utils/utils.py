@@ -4,18 +4,21 @@ from shutil import copy
 from javalang.parse import parse
 from javalang.parser import JavaSyntaxError
 from javalang.tokenizer import tokenize
-from anytree import Node, RenderTree
+from anytree import Node, RenderTree, PreOrderIter
 from anytree.exporter import JsonExporter
 import re
 import xml.etree.ElementTree as ET
 
 SPECIAL = ["<UNK>", "<BOF>", "<EOF>"]
+DATA_PATH = "../"
+
 
 def _prepare_raw_data():
     DATA_PATH = "elasticsearch"
-    data_results = pd.DataFrame(columns=['ID','Name','LongName','Parent','McCC','CLOC','LLOC',
-                                         'Number of previous fixes','Number of developer commits','Number of committers',
-                                         'Number of previous modifications','Number of bugs'])
+    data_results = pd.DataFrame(columns=['ID', 'Name', 'LongName', 'Parent', 'McCC', 'CLOC', 'LLOC',
+                                         'Number of previous fixes', 'Number of developer commits',
+                                         'Number of committers',
+                                         'Number of previous modifications', 'Number of bugs'])
     new_path = []
     for id, file in enumerate(os.listdir(DATA_PATH)):
         source_path = DATA_PATH + "/" + file
@@ -38,6 +41,7 @@ def _prepare_raw_data():
     data_results.to_csv('metadata.csv')
     print("Finish!!!!")
 
+
 def preproces(filename, vocab, output_path):
     test = """
 package org.owasp.benchmark.testcode;
@@ -52,9 +56,9 @@ import javax.servlet.http.HttpServletResponse;
 
 @WebServlet("/BenchmarkTest00001")
 public class BenchmarkTest00001 extends HttpServlet {
-	
+
 	private static final long serialVersionUID = 1L;
-	
+
 	@Override
 	public void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		doPost(request, response);
@@ -65,7 +69,7 @@ public class BenchmarkTest00001 extends HttpServlet {
 		// some code
 
 		javax.servlet.http.Cookie[] cookies = request.getCookies();
-		
+
 		String param = null;
 		boolean foundit = false;
 		if (cookies != null) {
@@ -84,7 +88,7 @@ public class BenchmarkTest00001 extends HttpServlet {
 			param = "";
 		}
 
-		
+
 		java.security.Provider[] provider = java.security.Security.getProviders();
 		javax.crypto.Cipher c;
 
@@ -138,39 +142,58 @@ public class BenchmarkTest00001 extends HttpServlet {
 def preprocess_ver2(xml_file, vocab):
     tree = ET.parse(xml_file)
     root = tree.getroot()
+    print("Extracting xml file!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    previous = ""
+    bug_instances = []
     for ele in root:
         if ele.tag == "BugInstance":
-            previous = ""
             for child in ele:
                 if child.tag == "SourceLine":
-                    previous = child.attrib['classname']
+                    previous = child.attrib['sourcepath']
                     break
-            bug_instances = []
+            break
+    for ele in root:
+        if ele.tag == "BugInstance":
             for child in ele:
                 if child.tag == "SourceLine":
                     attrib = child.attrib
-                    if previous == attrib['classname']:
+                    if previous == attrib['sourcepath']:
                         bug_instances.append(attrib)
                     else:
-                        extract_data(previous, bug_instances, vocab)
                         bug_instances = [attrib]
-                        previous = attrib['classname']
+                        previous = attrib['sourcepath']
+    extract_data(previous, bug_instances, vocab)
+
 
 def extract_data(filename, bug_instances, vocab):
     list_re = []
-    with open(filename, encoding="utf-8") as file:
+    # print("Extracting " + filename + " tree!!!!!!!!!!!!!!!!!!!")
+    with open(os.path.join(DATA_PATH, filename), encoding="utf-8") as file:
         lines = [line.strip() for line in file.readlines()]
         for bug in bug_instances:
             start = bug['start']
             end = bug['end']
-            for line in range(start, end + 1):
+            for line in range(int(start), int(end) + 1):
                 clean = re.sub(r"[\"\'\s;(){}=+\-/!~<>.,%^&*#$|]+", " ", lines[line])
-                list_re.append("|".join([i for i in clean.split(" ") if i != ""]))
-    with open(filename, encoding='utf-8') as file:
+                list_clean = [i for i in clean.split(" ") if i != ""]
+                if len(list_clean) > 0:
+                    list_re.append("|".join(list_clean))
+    with open(os.path.join(DATA_PATH, filename), encoding='utf-8') as file:
         try:
             node = parse(file.read().strip())
             start = Node("<BOF>")
             traveler(node, start, list_re)
+            defect_node = ['' for i in range(len(list_re))]
+            max_value = [0 for i in range(len(list_re))]
+            for n in PreOrderIter(start):
+                for i in range(len(n.len_match)):
+                    if n.len_match[i] > max_value[i]:
+                        max_value[i] = n.len_match[i]
+                        defect_node[i] = n
+                        delattr(n, "len_match")
+            for n in defect_node:
+                n.isBug = True
+
             for pre, fill, n in RenderTree(start):
                 vocab.append(n.name)
         except Exception or AttributeError:
@@ -179,12 +202,13 @@ def extract_data(filename, bug_instances, vocab):
     exporter = JsonExporter()
     return exporter.export(start)
 
+
 def traveler(parse_node, tree_node, list_regex):
     catch_type = r"^\w+(?=\()"
-    catch_literial = r"(?<=(^Literal\())(.*value=(\w+))" # group3
-    catch_member = r"(?<=(^MemberReference\(member=))(\w+), postfix_operators=\[\'?([+-]{0,2})\'?\], prefix_operators=\[\'?([+-]{0,2})\'?\]" # group 2 3 4
-    catch_compare = r"(?<=(^BinaryOperation\())((.*)operator=([<>=!&|+-\/%^]+))(?=\)$)" # group 4
-    catch_assignment = r"(?<=(^Assignment\())((.*)type\=([<>=!&|+-\/%^]+))" # group 4
+    catch_literial = r"(?<=(^Literal\())(.*value=(\w+))"  # group3
+    catch_member = r"(?<=(^MemberReference\(member=))(\w+), postfix_operators=\[\'?([+-]{0,2})\'?\], prefix_operators=\[\'?([+-]{0,2})\'?\]"  # group 2 3 4
+    catch_compare = r"(?<=(^BinaryOperation\())((.*)operator=([<>=!&|+-\/%^]+))(?=\)$)"  # group 4
+    catch_assignment = r"(?<=(^Assignment\())((.*)type\=([<>=!&|+-\/%^]+))"  # group 4
     match = re.match(catch_type, parse_node.__str__())
 
     if match:
@@ -197,9 +221,9 @@ def traveler(parse_node, tree_node, list_regex):
     for i, n in enumerate(parse_node.children):
         if isinstance(n, list):
             for instance in n:
-                if re.match(r"\<class \'javalang\.tree\..*\'\>",str(type(instance))):
+                if re.match(r"\<class \'javalang\.tree\..*\'\>", str(type(instance))):
                     list_child.append(instance)
-        if re.match(r"\<class \'javalang\.tree\..*\'\>",str(type(n))):
+        if re.match(r"\<class \'javalang\.tree\..*\'\>", str(type(n))):
             list_child.append(n)
     if len(list_child) == 0:
         return
@@ -207,8 +231,9 @@ def traveler(parse_node, tree_node, list_regex):
         # print(list_child)
         for child in list_child:
             traveler(child, new_node, list_regex)
-        
-if __name__=="__main__":
+
+
+if __name__ == "__main__":
     bug_instance = """<BugInstance rank="15" category="SECURITY" instanceHash="98497b1a447356bffc77e14342efb7dc" instanceOccurrenceNum="0" priority="3" abbrev="SECCU" type="COOKIE_USAGE" instanceOccurrenceMax="2">
     <ShortMessage>Potentially Sensitive Data in Cookie</ShortMessage>
     <LongMessage>Sensitive data may be stored by the application in a cookie.</LongMessage>
@@ -227,4 +252,4 @@ if __name__=="__main__":
     </SourceLine>
     </BugInstance>"""
     # preproces('../elastic/data0/ElasticSearchException.java', [], ".")
-    preprocess_ver2("../Benchmark_1.2beta-findsecbugs-v1.4.3-196.xml", [])
+    print(preprocess_ver2("../test.xml", []))

@@ -6,8 +6,10 @@ from javalang.parser import JavaSyntaxError
 from javalang.tokenizer import tokenize
 from anytree import Node, RenderTree, PreOrderIter
 from anytree.exporter import JsonExporter
+from anytree.walker import Walker
+from copy import deepcopy
 import re
-import xml.etree.ElementTree as ET
+from lxml import etree
 
 SPECIAL = ["<UNK>", "<BOF>", "<EOF>"]
 DATA_PATH = "../"
@@ -140,19 +142,21 @@ public class BenchmarkTest00001 extends HttpServlet {
 
 
 def preprocess_ver2(xml_file, vocab):
-    tree = ET.parse(xml_file)
-    root = tree.getroot()
+    with open(xml_file) as file:
+        xmlstring = file.read()
+    parser = etree.XMLParser(recover=True)
+    tree = etree.fromstring(xmlstring, parser=parser)
     print("Extracting xml file!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     previous = ""
     bug_instances = []
-    for ele in root:
+    for ele in tree:
         if ele.tag == "BugInstance":
             for child in ele:
                 if child.tag == "SourceLine":
                     previous = child.attrib['sourcepath']
                     break
             break
-    for ele in root:
+    for ele in tree:
         if ele.tag == "BugInstance":
             for child in ele:
                 if child.tag == "SourceLine":
@@ -169,45 +173,55 @@ def preprocess_ver2(xml_file, vocab):
 def extract_data(filename, bug_instances, vocab):
     list_re = []
     # print("Extracting " + filename + " tree!!!!!!!!!!!!!!!!!!!")
-    match_cmt = ""
-    match_class = ""
+    match_cmt = r"\/\/.*"
+    match_class = "(\w+\.)+[A-Z]\w+"
+    match_string = r"\"([^\"]+)\"|\'([^\"']+)\'"
     with open(os.path.join(DATA_PATH, filename), encoding="utf-8") as file:
         lines = [line.strip() for line in file.readlines()]
         for bug in bug_instances:
             start = bug['start']
             end = bug['end']
-            for line in range(int(start), int(end) + 1):
-                clean_cmt = re.sub(r"", " ", lines[line])
-                clean = re.sub(r"[\"\'\s;(){}=+\-/!~<>.,%^&*#$|]+", " ", lines[line])
+            for line in range(int(start) - 1, int(end)):
+                clean_cmt = re.sub(match_cmt, " ", lines[line])
+                clean_string, list_string = search_and_replace(match_string, clean_cmt)
+                clean_class, list_class = search_and_replace(match_class, clean_string)
+                clean = re.sub(r"[\s;(){}=+\-/!~<>.,%^&*#$|]+", " ", clean_class)
                 list_clean = [i for i in clean.split(" ") if i != ""]
+                list_clean.extend([i.group().replace("\"", r"\"") for i in list_string])
+                list_clean.extend([i.group().replace(".", r"\.") for i in list_class])
+                list_clean.extend([i.group().replace(".", r"\.") for i in list_class])
                 if len(list_clean) > 0:
                     list_re.append("|".join(list_clean))
+    print(list_re)
     with open(os.path.join(DATA_PATH, filename), encoding='utf-8') as file:
         try:
             node = parse(file.read().strip())
             start = Node("<BOF>")
-            traveler(node, start, list_re)
+            len_match = [0 for i in range(len(list_re))]
+            traveler(node, start, list_re, len_match)
             defect_node = ['' for i in range(len(list_re))]
             max_value = [0 for i in range(len(list_re))]
             for n in PreOrderIter(start):
-                for i in range(len(n.len_match)):
-                    if n.len_match[i] > max_value[i]:
-                        max_value[i] = n.len_match[i]
-                        defect_node[i] = n
-                        delattr(n, "len_match")
-            for n in defect_node:
+                if hasattr(n, "len_match"):
+                    for i in range(len(n.len_match)):
+                        if n.len_match[i] > max_value[i]:
+                            max_value[i] = n.len_match[i]
+                            defect_node[i] = n
+            for i, n in enumerate(defect_node):
+                n.regex = list_re[i]
                 n.isBug = True
 
             for pre, fill, n in RenderTree(start):
                 vocab.append(n.name)
-        except Exception or AttributeError:
+        except IOError:
             print(filename)
             return ''
     exporter = JsonExporter()
-    return exporter.export(start)
+    print(exporter.export(start))
+    # return exporter.export(start)
 
 
-def traveler(parse_node, tree_node, list_regex):
+def traveler(parse_node, tree_node, list_regex, len_match):
     catch_type = r"^\w+(?=\()"
     catch_literial = r"(?<=(^Literal\())(.*value=(\w+))"  # group3
     catch_member = r"(?<=(^MemberReference\(member=))(\w+), postfix_operators=\[\'?([+-]{0,2})\'?\], prefix_operators=\[\'?([+-]{0,2})\'?\]"  # group 2 3 4
@@ -220,8 +234,14 @@ def traveler(parse_node, tree_node, list_regex):
     else:
         return
     new_node = Node(type_n, parent=tree_node)
-    new_node.len_match = [len(re.findall(i, parse_node.__str__())) for i in list_regex]
     list_child = []
+    print(parse_node)
+    for i, r in enumerate(list_regex):
+        for attr in parse_node.attrs:
+            if isinstance(getattr(parse_node, attr), str):
+                len_match[i] += len(re.findall(r, getattr(parse_node, attr)))
+
+
     for i, n in enumerate(parse_node.children):
         if isinstance(n, list):
             for instance in n:
@@ -230,17 +250,34 @@ def traveler(parse_node, tree_node, list_regex):
         if re.match(r"\<class \'javalang\.tree\..*\'\>", str(type(n))):
             list_child.append(n)
     if len(list_child) == 0:
+        new_node.attr = [(attr, getattr(parse_node, attr)) for attr in parse_node.attrs if isinstance(getattr(parse_node, attr), str)]
+        new_node.len_match = len_match
         return
     else:
         # print(list_child)
         for child in list_child:
-            traveler(child, new_node, list_regex)
+            len_father = deepcopy(len_match)
+            traveler(child, new_node, list_regex, len_father)
 
 def search_and_replace(pattern, string):
-    pass
+    list_string = re.finditer(pattern, string, re.M)
+    clean_string = re.sub(pattern, " ", string)
+    return clean_string, list_string
 
-def get_branch():
-    pass
+def get_branch(start_node, defect_node):
+    walker = Walker()
+    for node in defect_node:
+        up_node, current, downnode = walker.walk(start_node, node)
+        start = Node(current.name)
+        start_method = Node(current.name)
+        for n in downnode:
+            if n.name == "MethodDeclaration":
+                new_node = deepcopy(n)
+                new_node.parent = start_method
+            new_node = Node(n.name, parent=start)
+            start_method = new_node
+    return
+
 
 
 if __name__ == "__main__":

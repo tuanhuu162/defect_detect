@@ -1,0 +1,104 @@
+<BugInstances>
+<BugInstance instanceOccurrenceNum="0" instanceHash="5b4c207b0b4dbb7e1ccc578c5df05f93" rank="19" abbrev="Dm" category="I18N" priority="1" type="DM_DEFAULT_ENCODING" instanceOccurrenceMax="0">
+<ShortMessage>Reliance on default encoding</ShortMessage>
+<LongMessage>
+Found reliance on default encoding in org.owasp.benchmark.testcode.BenchmarkTest06982.doPost(HttpServletRequest, HttpServletResponse): new String(byte[])
+</LongMessage>
+<Class classname="org.owasp.benchmark.testcode.BenchmarkTest06982" primary="true">
+<SourceLine classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="30" end="74" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java">
+<Message>At BenchmarkTest06982.java:[lines 30-74]</Message>
+</SourceLine>
+<Message>
+In class org.owasp.benchmark.testcode.BenchmarkTest06982
+</Message>
+</Class>
+<Method isStatic="false" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" signature="(Ljavax/servlet/http/HttpServletRequest;Ljavax/servlet/http/HttpServletResponse;)V" name="doPost" primary="true">
+<SourceLine endBytecode="684" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="42" end="74" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java" startBytecode="0"/>
+<Message>
+In method org.owasp.benchmark.testcode.BenchmarkTest06982.doPost(HttpServletRequest, HttpServletResponse)
+</Message>
+</Method>
+<Method isStatic="false" role="METHOD_CALLED" classname="java.lang.String" signature="([B)V" name="<init>">
+<SourceLine endBytecode="36" classname="java.lang.String" start="566" end="567" sourcepath="java/lang/String.java" sourcefile="String.java" startBytecode="0"/>
+<Message>Called method new String(byte[])</Message>
+</Method>
+<SourceLine endBytecode="142" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="55" end="55" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java" startBytecode="142" primary="true">
+<Message>At BenchmarkTest06982.java:[line 55]</Message>
+</SourceLine>
+</BugInstance>
+<BugInstance instanceOccurrenceNum="0" instanceHash="112983335796b8ca3eb13cfc7ef802e6" rank="19" abbrev="Dm" category="I18N" priority="1" type="DM_DEFAULT_ENCODING" instanceOccurrenceMax="0">
+<ShortMessage>Reliance on default encoding</ShortMessage>
+<LongMessage>
+Found reliance on default encoding in org.owasp.benchmark.testcode.BenchmarkTest06982.doPost(HttpServletRequest, HttpServletResponse): String.getBytes()
+</LongMessage>
+<Class classname="org.owasp.benchmark.testcode.BenchmarkTest06982" primary="true">
+<SourceLine classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="30" end="74" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java">
+<Message>At BenchmarkTest06982.java:[lines 30-74]</Message>
+</SourceLine>
+<Message>
+In class org.owasp.benchmark.testcode.BenchmarkTest06982
+</Message>
+</Class>
+<Method isStatic="false" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" signature="(Ljavax/servlet/http/HttpServletRequest;Ljavax/servlet/http/HttpServletResponse;)V" name="doPost" primary="true">
+<SourceLine endBytecode="684" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="42" end="74" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java" startBytecode="0"/>
+<Message>
+In method org.owasp.benchmark.testcode.BenchmarkTest06982.doPost(HttpServletRequest, HttpServletResponse)
+</Message>
+</Method>
+<Method isStatic="false" role="METHOD_CALLED" classname="java.lang.String" signature="()[B" name="getBytes">
+<SourceLine endBytecode="37" classname="java.lang.String" start="958" end="958" sourcepath="java/lang/String.java" sourcefile="String.java" startBytecode="0"/>
+<Message>Called method String.getBytes()</Message>
+</Method>
+<SourceLine endBytecode="133" classname="org.owasp.benchmark.testcode.BenchmarkTest06982" start="56" end="56" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06982.java" sourcefile="BenchmarkTest06982.java" startBytecode="133" primary="true">
+<Message>At BenchmarkTest06982.java:[line 56]</Message>
+</SourceLine>
+</BugInstance>
+<BugInstance instanceOccurrenceNum="0" instanceHash="8c72ff1b4f5f03f606e4b013166b80b4" cweid="563" rank="20" abbrev="DLS" category="STYLE" priority="3" type="DLS_DEAD_LOCAL_STORE" instanceOccurrenceMax="0">
+<ShortMessage>Dead store to local variable</ShortMessage>
+<LongMessage>
+Dead store to bar in org.owasp.benchmark.testcode.BenchmarkTest06984.doPost(HttpServletRequest, HttpServletResponse)
+</LongMessage>
+<Class classname="org.owasp.benchmark.testcode.BenchmarkTest06984" primary="true">
+<SourceLine classname="org.owasp.benchmark.testcode.BenchmarkTest06984" start="30" end="67" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06984.java" sourcefile="BenchmarkTest06984.java">
+<Message>At BenchmarkTest06984.java:[lines 30-67]</Message>
+</SourceLine>
+<Message>
+In class org.owasp.benchmark.testcode.BenchmarkTest06984
+</Message>
+</Class>
+<Method isStatic="false" classname="org.owasp.benchmark.testcode.BenchmarkTest06984" signature="(Ljavax/servlet/http/HttpServletRequest;Ljavax/servlet/http/HttpServletResponse;)V" name="doPost" primary="true">
+<SourceLine endBytecode="82" classname="org.owasp.benchmark.testcode.BenchmarkTest06984" start="42" end="67" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06984.java" sourcefile="BenchmarkTest06984.java" startBytecode="0"/>
+<Message>
+In method org.owasp.benchmark.testcode.BenchmarkTest06984.doPost(HttpServletRequest, HttpServletResponse)
+</Message>
+</Method>
+<LocalVariable role="LOCAL_VARIABLE_NAMED" pc="75" name="bar" register="5">
+<Message>Local variable named bar</Message>
+</LocalVariable>
+<SourceLine endBytecode="73" classname="org.owasp.benchmark.testcode.BenchmarkTest06984" start="51" end="51" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06984.java" sourcefile="BenchmarkTest06984.java" startBytecode="73" primary="true">
+<Message>At BenchmarkTest06984.java:[line 51]</Message>
+</SourceLine>
+<Property name="edu.umd.cs.findbugs.detect.DeadLocalStoreProperty.BASE_VALUE" value="true"/>
+<Property name="edu.umd.cs.findbugs.detect.DeadLocalStoreProperty.KILLED_BY_SUBSEQUENT_STORE" value="true"/>
+<Property name="edu.umd.cs.findbugs.detect.DeadLocalStoreProperty.LOCAL_NAME" value="bar"/>
+</BugInstance>
+<BugInstance instanceOccurrenceNum="0" instanceHash="dc221f922429a7b2680aa1b87d154228" rank="20" abbrev="Dm" category="PERFORMANCE" priority="3" type="DM_STRING_TOSTRING" instanceOccurrenceMax="0">
+<ShortMessage>Method invokes toString() method on a String</ShortMessage>
+<LongMessage>
+org.owasp.benchmark.testcode.BenchmarkTest06984.doPost(HttpServletRequest, HttpServletResponse) invokes toString() method on a String
+</LongMessage>
+<Class classname="org.owasp.benchmark.testcode.BenchmarkTest06984" primary="true">
+<SourceLine classname="org.owasp.benchmark.testcode.BenchmarkTest06984" start="30" end="67" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06984.java" sourcefile="BenchmarkTest06984.java">
+<Message>At BenchmarkTest06984.java:[lines 30-67]</Message>
+</SourceLine>
+<Message>
+In class org.owasp.benchmark.testcode.BenchmarkTest06984
+</Message>
+</Class>
+<Method isStatic="false" classname="org.owasp.benchmark.testcode.BenchmarkTest06984" signature="(Ljavax/servlet/http/HttpServletRequest;Ljavax/servlet/http/HttpServletResponse;)V" name="doPost" primary="true">
+</Method>
+<SourceLine endBytecode="46" classname="org.owasp.benchmark.testcode.BenchmarkTest06984" start="49" end="49" sourcepath="org/owasp/benchmark/testcode/BenchmarkTest06984.java" sourcefile="BenchmarkTest06984.java" startBytecode="46" primary="true">
+<Message>At BenchmarkTest06984.java:[line 49]</Message>
+</SourceLine>
+</BugInstance>
+</BugInstances>

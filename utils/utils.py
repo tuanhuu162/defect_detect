@@ -10,9 +10,11 @@ from anytree.walker import Walker
 from copy import deepcopy
 import re
 from lxml import etree
+import json
 
 SPECIAL = ["<UNK>", "<BOF>", "<EOF>"]
 DATA_PATH = "../"
+OUTDIR = "../json_data"
 
 
 def _prepare_raw_data():
@@ -147,6 +149,16 @@ def preprocess_ver2(xml_file, vocab):
     parser = etree.XMLParser(recover=True)
     tree = etree.fromstring(xmlstring, parser=parser)
     print("Extracting xml file!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+    data = pd.read_csv(os.path.join(DATA_PATH, "Benchmark_v1.1_Scorecard_for_FindBugs.csv"))
+    list_label = []
+    for i in range(len(data)):
+        if data.loc[i, ' real vulnerability'] == " true" and data.loc[i, ' pass/fail'] == " pass":
+            list_label.append((data.loc[i, '# test name'], 1))
+        elif data.loc[i, ' real vulnerability'] == " true" and data.loc[i, ' pass/fail'] == " fail":
+            list_label.append((data.loc[i, '# test name'], 0))
+        else:
+            list_label.append((data.loc[i, '# test name'], 2))
+
     previous = ""
     bug_instances = []
     for ele in tree:
@@ -169,10 +181,16 @@ def preprocess_ver2(xml_file, vocab):
                         previous = attrib['sourcepath']
     extract_data(previous, bug_instances, vocab)
 
+    vocab = set(vocab)
+    with open('vocab', 'w') as file:
+        for i in vocab:
+            file.write(i + "\n")
+
 
 def extract_data(filename, bug_instances, vocab):
     list_re = []
-    # print("Extracting " + filename + " tree!!!!!!!!!!!!!!!!!!!")
+    base_name = filename.split("/")[-1].split(".")[0]
+    print("Extracting " + base_name + " tree!!!!!!!!!!!!!!!!!!!")
     match_cmt = r"\/\/.*"
     match_class = "(\w+\.)+[A-Z]\w+"
     match_string = r"\"([^\"]+)\"|\'([^\"']+)\'"
@@ -192,7 +210,7 @@ def extract_data(filename, bug_instances, vocab):
                 list_clean.extend([i.group().replace(".", r"\.") for i in list_class])
                 if len(list_clean) > 0:
                     list_re.append("|".join(list_clean))
-    print(list_re)
+    # print(list_re)
     with open(os.path.join(DATA_PATH, filename), encoding='utf-8') as file:
         try:
             node = parse(file.read().strip())
@@ -217,9 +235,16 @@ def extract_data(filename, bug_instances, vocab):
             print(filename)
             return ''
     exporter = JsonExporter()
-    print(exporter.export(start))
-    # return exporter.export(start)
-
+    list_bug, list_method = get_branch(start, defect_node)
+    list_data = {
+        "bug": [],
+        "method": []
+    }
+    for i in range(len(list_bug)):
+        list_data["bug"].append(exporter.export(list_bug[i]))
+        list_data["method"].append(exporter.export(list_method[i]))
+    with open(os.path.join(OUTDIR, base_name + ".json"), "w") as file:
+        file.write(json.dumps(list_data))
 
 def traveler(parse_node, tree_node, list_regex, len_match):
     catch_type = r"^\w+(?=\()"
@@ -235,7 +260,7 @@ def traveler(parse_node, tree_node, list_regex, len_match):
         return
     new_node = Node(type_n, parent=tree_node)
     list_child = []
-    print(parse_node)
+    # print(parse_node)
     for i, r in enumerate(list_regex):
         for attr in parse_node.attrs:
             if isinstance(getattr(parse_node, attr), str):
@@ -266,17 +291,30 @@ def search_and_replace(pattern, string):
 
 def get_branch(start_node, defect_node):
     walker = Walker()
+    list_bug = []
+    list_method = []
+    exporter = JsonExporter()
     for node in defect_node:
         up_node, current, downnode = walker.walk(start_node, node)
         start = Node(current.name)
+        list_bug.append(start)
         start_method = Node(current.name)
+        list_method.append(start_method)
         for n in downnode:
             if n.name == "MethodDeclaration":
                 new_node = deepcopy(n)
                 new_node.parent = start_method
-            new_node = Node(n.name, parent=start)
+                break
+            new_node = Node(n.name, parent=start_method)
             start_method = new_node
-    return
+        for n in downnode:
+            new_node = Node(n.name, parent=start)
+            start = new_node
+    # for i in range(len(list_bug)):
+    #     print(exporter.export(list_bug[i]))
+    #     print(exporter.export(list_method[i]))
+
+    return list_bug, list_method
 
 
 

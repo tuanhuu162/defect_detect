@@ -150,14 +150,15 @@ def preprocess_ver2(xml_file, vocab):
     tree = etree.fromstring(xmlstring, parser=parser)
     print("Extracting xml file!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     data = pd.read_csv(os.path.join(DATA_PATH, "Benchmark_v1.1_Scorecard_for_FindBugs.csv"))
-    list_label = []
+    list_label = {}
     for i in range(len(data)):
         if data.loc[i, ' real vulnerability'] == " true" and data.loc[i, ' pass/fail'] == " pass":
-            list_label.append((data.loc[i, '# test name'], 1))
+            list_label[data.loc[i, '# test name']] = 1
         elif data.loc[i, ' real vulnerability'] == " true" and data.loc[i, ' pass/fail'] == " fail":
-            list_label.append((data.loc[i, '# test name'], 0))
+            list_label[data.loc[i, '# test name']] = 0
         else:
-            list_label.append((data.loc[i, '# test name'], 2))
+            list_label[data.loc[i, '# test name']] = 2
+
 
     previous = ""
     bug_instances = []
@@ -168,6 +169,7 @@ def preprocess_ver2(xml_file, vocab):
                     previous = child.attrib['sourcepath']
                     break
             break
+
     for ele in tree:
         if ele.tag == "BugInstance":
             for child in ele:
@@ -176,20 +178,24 @@ def preprocess_ver2(xml_file, vocab):
                     if previous == attrib['sourcepath']:
                         bug_instances.append(attrib)
                     else:
-                        extract_data(previous, bug_instances, vocab)
+                        extract_data(previous, bug_instances, vocab, list_label)
                         bug_instances = [attrib]
                         previous = attrib['sourcepath']
-    extract_data(previous, bug_instances, vocab)
+    extract_data(previous, bug_instances, vocab, list_label)
 
     vocab = set(vocab)
-    with open('vocab', 'w') as file:
+    with open(os.path.join(OUTDIR, "vocab"), 'w') as file:
         for i in vocab:
             file.write(i + "\n")
 
 
-def extract_data(filename, bug_instances, vocab):
+def extract_data(filename, bug_instances, vocab, list_label):
     list_re = []
     base_name = filename.split("/")[-1].split(".")[0]
+    if not re.match(r"BenchmarkTest.*", base_name):
+        return
+    if list_label[base_name] == 2:
+        return
     print("Extracting " + base_name + " tree!!!!!!!!!!!!!!!!!!!")
     match_cmt = r"\/\/.*"
     match_class = "(\w+\.)+[A-Z]\w+"
@@ -203,20 +209,20 @@ def extract_data(filename, bug_instances, vocab):
                 clean_cmt = re.sub(match_cmt, " ", lines[line])
                 clean_string, list_string = search_and_replace(match_string, clean_cmt)
                 clean_class, list_class = search_and_replace(match_class, clean_string)
-                clean = re.sub(r"[\s;(){}=+\-/!~<>.,%^&*#$|]+", " ", clean_class)
+                clean = re.sub(r"[\s;\]\[(){}=+\-/?:!~<>.,%^&*#$|]+", " ", clean_class)
                 list_clean = [i for i in clean.split(" ") if i != ""]
                 list_clean.extend([i.group().replace("\"", r"\"") for i in list_string])
                 list_clean.extend([i.group().replace(".", r"\.") for i in list_class])
                 list_clean.extend([i.group().replace(".", r"\.") for i in list_class])
                 if len(list_clean) > 0:
                     list_re.append("|".join(list_clean))
-    # print(list_re)
     with open(os.path.join(DATA_PATH, filename), encoding='utf-8') as file:
         try:
             node = parse(file.read().strip())
             start = Node("<BOF>")
             len_match = [0 for i in range(len(list_re))]
             traveler(node, start, list_re, len_match)
+            del node
             defect_node = ['' for i in range(len(list_re))]
             max_value = [0 for i in range(len(list_re))]
             for n in PreOrderIter(start):
@@ -236,15 +242,20 @@ def extract_data(filename, bug_instances, vocab):
             return ''
     exporter = JsonExporter()
     list_bug, list_method = get_branch(start, defect_node)
+    
     list_data = {
         "bug": [],
-        "method": []
+        "method": [],
+        "label": []
     }
     for i in range(len(list_bug)):
         list_data["bug"].append(exporter.export(list_bug[i]))
         list_data["method"].append(exporter.export(list_method[i]))
-    with open(os.path.join(OUTDIR, base_name + ".json"), "w") as file:
+        list_data["label"].append(list_label[base_name])
+    with open(os.path.join(OUTDIR, "data.json"), "w") as file:
         file.write(json.dumps(list_data))
+    print("Finish !!!!!!!!!!!!!!!!!!!")
+
 
 def traveler(parse_node, tree_node, list_regex, len_match):
     catch_type = r"^\w+(?=\()"
@@ -263,9 +274,12 @@ def traveler(parse_node, tree_node, list_regex, len_match):
     # print(parse_node)
     for i, r in enumerate(list_regex):
         for attr in parse_node.attrs:
-            if isinstance(getattr(parse_node, attr), str):
-                len_match[i] += len(re.findall(r, getattr(parse_node, attr)))
-
+            try:
+                if isinstance(getattr(parse_node, attr), str):
+                    len_match[i] += len(re.findall(r, getattr(parse_node, attr)))
+            except Exception as e:
+                print(r)
+                raise e
 
     for i, n in enumerate(parse_node.children):
         if isinstance(n, list):
@@ -316,6 +330,12 @@ def get_branch(start_node, defect_node):
 
     return list_bug, list_method
 
+def test_parser():
+    path = "../org/owasp/benchmark/testcode/BenchmarkTest06923.java"
+    with open(path) as file:
+        data = file.read().strip()
+        print(data)
+        tree = parse(data)
 
 
 if __name__ == "__main__":
@@ -337,4 +357,6 @@ if __name__ == "__main__":
     </SourceLine>
     </BugInstance>"""
     # preproces('../elastic/data0/ElasticSearchException.java', [], ".")
-    print(preprocess_ver2("../test.xml", []))
+    # print()
+    preprocess_ver2("../spotbugsXml.xml", [])
+    # test_parser()

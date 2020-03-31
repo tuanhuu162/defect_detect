@@ -169,7 +169,13 @@ def preprocess_ver2(xml_file, vocab):
                     previous = child.attrib['sourcepath']
                     break
             break
-
+    # with open(os.path.join(OUTDIR, "data.csv"), "w") as file:
+    list_data = {
+        "bug": [],
+        "method": [],
+        "label": []
+    }
+    # file.write("bug|method|label\n")
     for ele in tree:
         if ele.tag == "BugInstance":
             for child in ele:
@@ -178,25 +184,26 @@ def preprocess_ver2(xml_file, vocab):
                     if previous == attrib['sourcepath']:
                         bug_instances.append(attrib)
                     else:
-                        extract_data(previous, bug_instances, vocab, list_label)
+                        extract_data(previous, bug_instances, vocab, list_data, list_label)
                         bug_instances = [attrib]
                         previous = attrib['sourcepath']
-    extract_data(previous, bug_instances, vocab, list_label)
+    extract_data(previous, bug_instances, vocab, list_data, list_label)
 
     vocab = set(vocab)
     with open(os.path.join(OUTDIR, "vocab"), 'w') as file:
         for i in vocab:
             file.write(i + "\n")
+    with open(os.path.join(OUTDIR, "data.json"), 'w') as file:
+        file.write(json.dumps(list_data))
 
-
-def extract_data(filename, bug_instances, vocab, list_label):
+# def extract_data(filename, bug_instances, vocab, data_file, list_label):
+def extract_data(filename, bug_instances, vocab, list_data, list_label):
     list_re = []
     base_name = filename.split("/")[-1].split(".")[0]
     if not re.match(r"BenchmarkTest.*", base_name):
         return
     if list_label[base_name] == 2:
         return
-    print("Extracting " + base_name + " tree!!!!!!!!!!!!!!!!!!!")
     match_cmt = r"\/\/.*"
     match_class = "(\w+\.)+[A-Z]\w+"
     match_string = r"\"([^\"]+)\"|\'([^\"']+)\'"
@@ -220,6 +227,7 @@ def extract_data(filename, bug_instances, vocab, list_label):
         try:
             node = parse(file.read().strip())
             start = Node("<BOF>")
+            print("Extracting " + base_name + " tree!!!!!!!!!!!!!!!!!!!")
             len_match = [0 for i in range(len(list_re))]
             traveler(node, start, list_re, len_match)
             del node
@@ -232,29 +240,28 @@ def extract_data(filename, bug_instances, vocab, list_label):
                             max_value[i] = n.len_match[i]
                             defect_node[i] = n
             for i, n in enumerate(defect_node):
-                n.regex = list_re[i]
+                # n.regex = list_re[i]
                 n.isBug = True
 
             for pre, fill, n in RenderTree(start):
                 vocab.append(n.name)
-        except IOError:
+        except AttributeError:
             print(filename)
             return ''
     exporter = JsonExporter()
     list_bug, list_method = get_branch(start, defect_node)
     
-    list_data = {
-        "bug": [],
-        "method": [],
-        "label": []
-    }
+
     for i in range(len(list_bug)):
         list_data["bug"].append(exporter.export(list_bug[i]))
         list_data["method"].append(exporter.export(list_method[i]))
         list_data["label"].append(list_label[base_name])
-    with open(os.path.join(OUTDIR, "data.json"), "w") as file:
-        file.write(json.dumps(list_data))
-    print("Finish !!!!!!!!!!!!!!!!!!!")
+        # bug = exporter.export(list_bug[i])
+        # method = exporter.export(list_method[i])
+        # data_file.write("%r" % (json.dumps(bug)) + "|" + "%r" % (json.dumps(method)) + "|" + str(list_label[base_name]) + "\n")
+    # with open(os.path.join(OUTDIR, "data.json"), "w") as file:
+    #     file.write(json.dumps(list_data))
+    # print("Finish !!!!!!!!!!!!!!!!!!!")
 
 
 def traveler(parse_node, tree_node, list_regex, len_match):
@@ -289,7 +296,7 @@ def traveler(parse_node, tree_node, list_regex, len_match):
         if re.match(r"\<class \'javalang\.tree\..*\'\>", str(type(n))):
             list_child.append(n)
     if len(list_child) == 0:
-        new_node.attr = [(attr, getattr(parse_node, attr)) for attr in parse_node.attrs if isinstance(getattr(parse_node, attr), str)]
+        # new_node.attr = [(attr, getattr(parse_node, attr)) for attr in parse_node.attrs if isinstance(getattr(parse_node, attr), str)]
         new_node.len_match = len_match
         return
     else:
@@ -331,7 +338,7 @@ def get_branch(start_node, defect_node):
     return list_bug, list_method
 
 def test_parser():
-    path = "../org/owasp/benchmark/testcode/BenchmarkTest06923.java"
+    path = "../BenchmarkTest07216.java"
     with open(path) as file:
         data = file.read().strip()
         print(data)

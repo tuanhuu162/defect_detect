@@ -224,3 +224,59 @@ class TransformerModel(nn.Module):
         # print(src.shape)
         output = self.transformer_encoder(src, self.src_mask)
         return self.classify(output)
+
+
+
+class BiLSTM_Attention_owasp(nn.Module):
+    def __init__(self, embedding_dim, num_vocab, num_classes, n_hidden):
+        super(BiLSTM_Attention_owasp, self).__init__()
+        self.embedding_dim = embedding_dim
+        self.num_vocab = num_vocab
+        self.num_classes = num_classes
+        self.n_hidden = n_hidden
+
+        self.embedding = nn.Embedding(num_vocab, embedding_dim)
+        self.lstm = nn.LSTM(embedding_dim, n_hidden, bidirectional=True)
+        self.out = nn.Linear(n_hidden * 2, num_classes)
+
+    # lstm_output : [batch_size, n_step, n_hidden * num_directions(=2)], F matrix
+    def attention_net(self, lstm_output, final_state):
+        hidden = final_state.view(-1, self.n_hidden * 2,
+                                  1)  # hidden : [batch_size, n_hidden * num_directions(=2), 1(=n_layer)]
+        attn_weights = torch.bmm(lstm_output, hidden).squeeze(2)  # attn_weights : [batch_size, n_step]
+        soft_attn_weights = F.softmax(attn_weights, 1)
+        # [batch_size, n_hidden * num_directions(=2), n_step] * [batch_size, n_step, 1] = [batch_size, n_hidden * num_directions(=2), 1]
+        context = torch.bmm(lstm_output.transpose(1, 2), soft_attn_weights.unsqueeze(2)).squeeze(2)
+        return context, soft_attn_weights.data.numpy()  # context : [batch_size, n_hidden * num_directions(=2)]
+
+    def forward(self, X1, X2):
+        input1 = self.embedding(X1)  # input : [batch_size, len_seq, embedding_dim]
+        input1 = input1.permute(1, 0, 2)  # input : [len_seq, batch_size, embedding_dim]
+
+        hidden_state1 = Variable(
+            torch.zeros(1 * 2, len(X1), self.n_hidden))  # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+        cell_state1 = Variable(
+            torch.zeros(1 * 2, len(X1), self.n_hidden))  # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+        input2 = self.embedding(X2)  # input : [batch_size, len_seq, embedding_dim]
+        input2 = input2.permute(1, 0, 2)  # input : [len_seq, batch_size, embedding_dim]
+
+        hidden_state2 = Variable(
+            torch.zeros(1 * 2, len(X2), self.n_hidden))  # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+        cell_state2 = Variable(
+            torch.zeros(1 * 2, len(X2), self.n_hidden))  # [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+
+
+        # final_hidden_state, final_cell_state : [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+        output1, (final_hidden_state1, final_cell_state1) = self.lstm(input1, (hidden_state1, cell_state1))
+        output1 = output1.permute(1, 0, 2)  # output : [batch_size, len_seq, n_hidden]
+
+        # final_hidden_state, final_cell_state : [num_layers(=1) * num_directions(=2), batch_size, n_hidden]
+        output2, (final_hidden_state2, final_cell_state2) = self.lstm(input2, (hidden_state2, cell_state2))
+        output2 = output2.permute(1, 0, 2)  # output : [batch_size, len_seq, n_hidden]
+
+        concated = torch.cat((output1, output2), dim=1)
+
+        final_hidden_state = final_hidden_state1 + final_hidden_state2
+
+        attn_output, attention = self.attention_net(concated, final_hidden_state)
+        return self.out(attn_output), attention  # model : [batch_size, num_classes], attention : [batch_size, n_step]

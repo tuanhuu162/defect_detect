@@ -48,12 +48,13 @@ class Trainer(object):
             return total_loss / len(dataset)
         else:
             for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
-                tree, label = dataset[idx]
+                bug, method, label = dataset[idx]
                 # print(label)
-                train_batch = Variable(tree.to(self.device))
+                train_bug = Variable(bug.to(self.device))
+                train_method = Variable(method.to(self.device))
                 train_label = Variable(torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).view(1, -1)
                                        .to(self.device))
-                output, _ = self.model(train_batch)
+                output, _ = self.model(train_bug, train_method)
                 # output = self.model(train_batch)
                 # print(output[0], label)
                 # print(output.shape)
@@ -97,11 +98,13 @@ class Trainer(object):
                 predictions = []
                 indices = torch.arange(1, dataset.num_classes + 1, dtype=torch.float, device='cpu')
                 for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
-                    tree, label = dataset[idx]
+                    bug, method, label = dataset[idx]
                     # print(label.shape)
-                    train_batch = Variable(tree.to(self.device))
-                    train_label = Variable(torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).view(1, -1).to(self.device))
-                    output, _ = self.model(train_batch)
+                    train_bug = Variable(bug.to(self.device))
+                    train_method = Variable(method.to(self.device))
+                    train_label = Variable(torch.tensor(self.to_categorical(label, 2), dtype=torch.float64).view(1, -1)
+                                           .to(self.device))
+                    output, _ = self.model(train_bug, train_method)
                     # output = self.model(train_batch)
                     # print(output[0], label)
                     # print(output.shape)

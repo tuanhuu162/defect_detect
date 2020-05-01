@@ -192,6 +192,8 @@ def extract_data(virtual_data, bug_instances, vocab, list_data, list_label):
     print("Extracting " + base_name + " tree!!!!!!!!!!!!!!!!!!!")
 
     label = list_label[base_name]
+    if label == 2:
+        return ''
     try:
         with open(os.path.join(DATA_PATH, virtual_data['class'][0])) as file:
             string = file.read().strip()

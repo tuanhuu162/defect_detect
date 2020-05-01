@@ -10,7 +10,8 @@ from numpy.random import permutation
 import json
 
 DATAPATH = "elastic/"
-DATAPATH2 = "json_data/data.json"
+DATAPATH2_juliet = "json_data/data_juliet2.json"
+DATAPATH2_owasp = "json_data/data_owasp.json"
 
 def make_dirs(dirs):
     for d in dirs:
@@ -97,7 +98,7 @@ def splitdata():
             file.write(i + "\n")
 
 def splitdata_2():
-    with open(DATAPATH2) as file:
+    with open(DATAPATH2_juliet) as file:
         data = json.loads(file.read())
     hasbug, nothave = [], []
     print("split data.........................")
@@ -109,24 +110,30 @@ def splitdata_2():
 
     print("split train .......................")
     print(len(hasbug), len(nothave))
-    indices_hasbug = permutation(2000)
-    train_data = [hasbug[i] for i in indices_hasbug[:int(len(indices_hasbug)*0.6)]]
-    test_data = [hasbug[i] for i in indices_hasbug[int(len(indices_hasbug)*0.6):int(len(indices_hasbug)*0.8)]]
+    indices_hasbug = permutation(len(hasbug))
+    train_data = [hasbug[i] for i in indices_hasbug[:int(len(indices_hasbug)*0.8)]]
+    # test_data = [hasbug[i] for i in indices_hasbug[int(len(indices_hasbug)*0.6):int(len(indices_hasbug)*0.8)]]
     dev_data = [hasbug[i] for i in indices_hasbug[int(len(indices_hasbug)*0.8):]]
 
 
-    indices_nothas = permutation(2000 + 1000)
-    train_data.extend([nothave[i] for i in indices_nothas[:int(len(indices_nothas)*0.6)]])
-    test_data.extend([nothave[i] for i in indices_nothas[int(len(indices_nothas)*0.6):int(len(indices_nothas)*0.8)]])
+
+    indices_nothas = permutation(len(hasbug) + 5000)
+    train_data.extend([nothave[i] for i in indices_nothas[:int(len(indices_nothas)*0.8)]])
+    # test_data.extend([nothave[i] for i in indices_nothas[int(len(indices_nothas)*0.6):int(len(indices_nothas)*0.8)]])
     dev_data.extend([nothave[i] for i in indices_nothas[int(len(indices_nothas)*0.8):]])
 
     train_data = [train_data[i] for i in permutation(len(train_data))]
-    test_data = [test_data[i] for i in permutation(len(test_data))]
+    # test_data = [test_data[i] for i in permutation(len(test_data))]
     dev_data = [dev_data[i] for i in permutation(len(dev_data))]
+
+    with open(DATAPATH2_owasp) as file:
+        test = json.loads(file.read())
+    test_data = [(test["bug"][i], test["method"][i], test["label"][i]) for i in permutation(len(test['label']))]
+    test_data = [test_data[i] for i in permutation(len(test_data))]
     print(len(train_data), len(test_data), len(dev_data))
 
     print("make ast data.....................")
-    with open('train_owasp.json', 'w') as file:
+    with open('train_final.json', 'w') as file:
         train_json = {
             "bug": [],
             "method": [],
@@ -138,7 +145,7 @@ def splitdata_2():
             train_json['label'].append(i[2])
         file.write(json.dumps(train_json))
 
-    with open('test_owasp.json', 'w') as file:
+    with open('test_final.json', 'w') as file:
         test_json = {
             "bug": [],
             "method": [],
@@ -150,7 +157,7 @@ def splitdata_2():
             test_json['label'].append(i[2])
         file.write(json.dumps(test_json))
 
-    with open('dev_owasp.json', 'w') as file:
+    with open('dev_final.json', 'w') as file:
         dev_json = {
             "bug": [],
             "method": [],

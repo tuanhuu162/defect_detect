@@ -169,10 +169,86 @@ def splitdata_2():
             dev_json['label'].append(i[2])
         file.write(json.dumps(dev_json))
 
+
+def split_data_each(path):
+    with open(path) as file:
+        data = json.loads(file.read())
+    hasbug, nothave = [], []
+    print("split data.........................")
+    for i in range(len(data["label"])):
+        if data["label"][i] == 1:
+            hasbug.append((data["bug"][i], data["method"][i], data["label"][i]))
+        else:
+            nothave.append((data["bug"][i], data["method"][i], data["label"][i]))
+
+    print("split train .......................")
+    print(len(hasbug), len(nothave))
+    indices_hasbug = permutation(len(hasbug))
+    train_data = [hasbug[i] for i in indices_hasbug[:int(len(indices_hasbug)*0.6)]]
+    test_data = [hasbug[i] for i in indices_hasbug[int(len(indices_hasbug)*0.6):int(len(indices_hasbug)*0.8)]]
+    dev_data = [hasbug[i] for i in indices_hasbug[int(len(indices_hasbug)*0.8):]]
+
+
+
+    indices_nothas = permutation(len(nothave))
+    train_data.extend([nothave[i] for i in indices_nothas[:int(len(indices_nothas)*0.6)]])
+    test_data.extend([nothave[i] for i in indices_nothas[int(len(indices_nothas)*0.6):int(len(indices_nothas)*0.8)]])
+    dev_data.extend([nothave[i] for i in indices_nothas[int(len(indices_nothas)*0.8):]])
+
+    train_data = [train_data[i] for i in permutation(len(train_data))]
+    test_data = [test_data[i] for i in permutation(len(test_data))]
+    dev_data = [dev_data[i] for i in permutation(len(dev_data))]
+
+    # with open(DATAPATH2_owasp) as file:
+    #     test = json.loads(file.read())
+    # test_data = [(test["bug"][i], test["method"][i], test["label"][i]) for i in permutation(len(test['label']))]
+    # test_data = [test_data[i] for i in permutation(len(test_data))]
+    # print(len(train_data), len(test_data), len(dev_data))
+
+    print("make ast data.....................")
+    with open('train_owasp.json', 'w') as file:
+        train_json = {
+            "bug": [],
+            "method": [],
+            "label": []
+        }
+        for i in train_data:
+            train_json['bug'].append(i[0])
+            train_json['method'].append(i[1])
+            train_json['label'].append(i[2])
+        file.write(json.dumps(train_json))
+
+    with open('test_owasp.json', 'w') as file:
+        test_json = {
+            "bug": [],
+            "method": [],
+            "label": []
+        }
+        for i in test_data:
+            test_json['bug'].append(i[0])
+            test_json['method'].append(i[1])
+            test_json['label'].append(i[2])
+        file.write(json.dumps(test_json))
+
+    with open('dev_owasp.json', 'w') as file:
+        dev_json = {
+            "bug": [],
+            "method": [],
+            "label": []
+        }
+        for i in dev_data:
+            dev_json['bug'].append(i[0])
+            dev_json['method'].append(i[1])
+            dev_json['label'].append(i[2])
+        file.write(json.dumps(dev_json))
+
+
+
 if __name__ == '__main__':
     print('=' * 80)
     print('Preprocessing elastic dataset')
     print('=' * 80)
     # splitdata()
-    splitdata_2()
+    # splitdata_2()
+    split_data_each(DATAPATH2_owasp)
     print("done!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
